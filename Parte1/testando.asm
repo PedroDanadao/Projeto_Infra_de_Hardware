@@ -3,7 +3,6 @@
 	j start
 
 .text
-	ga:
 	add $0, $0, $0
 	and $0, $0, $0
 	slt $t0, $a0, $a0
@@ -23,6 +22,6 @@
 	xori $13, $19, 132
 	slti $6, $29, 1000
 	lui $3, 65535
-		j ga
 	lw $1, -100($2)
+	div $1, $2, 100
 	syscall
