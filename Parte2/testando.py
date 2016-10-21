@@ -146,6 +146,15 @@ def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '',
     if func == "addi":
         registradores[registrador1] = str( int(registradores[registrador2]) + numero)
 
+    if func == "addu":
+        registradores[registrador1] = str(int(registradores[registrador2]) + int(registradores[registrador3]))
+
+    if func == "subu":
+        registradores[registrador1] = str(int(registradores[registrador2]) - int(registradores[registrador3]))
+
+    if func == "addiu":
+        registradores[registrador1] = str(int(registradores[registrador2]) + numero)
+
     if func == "lui":
         binNumero = decimalParaBinario(numero) + ( '0' * 16 )
         registradores[registrador1] =binarioParaDecimal(binNumero)
