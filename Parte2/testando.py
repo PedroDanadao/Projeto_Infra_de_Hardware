@@ -96,7 +96,7 @@ def escreveCodigo(binario, tipo):
             registrador1, registrador2, registrador3 = str(int(binario[16:21], 2)), str(int(binario[11:16], 2)), str(int(binario[6:11], 2))
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', $' + registrador3
             # vvvvvvvvvvvvvvvvvvvvvvvvvvv
-            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3) # <<<<<<<<<<<<<<<<<<<<
+            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3)
         else: # caso o func nao seja nenhum dos acima (ou seja, func eh dos que usam tres registradores, como 'add' ou 'sub')
             registrador1, registrador2, registrador3 = str(int(binario[16:21], 2)), str(int(binario[6:11], 2)), str(int(binario[11:16], 2))
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', $' + registrador3
