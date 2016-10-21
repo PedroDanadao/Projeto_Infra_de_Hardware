@@ -1,5 +1,5 @@
 
-HEXA = "0x38410003"
+HEXA = "0x3c010002"
 
 tipoR = {"100000":"add", "100010":"sub",
 "101010":"slt", "100100":"and", "100101":"or", "100110":"xor",
@@ -15,7 +15,7 @@ tipoIJ = {"001111":"lui", "001000":"addi", "001010":"slti",
 "000010":"j", "000011":"jal"}
 
 # dicionario com todos os registradores
-registradores = {"$0":"0",  "$1":"0",  "$2":"0",  "$3":"0",  "$4":"0",
+registradores = {"$0":"0",  "$1":"0",  "$2":"13",  "$3":"-31",  "$4":"0",
 "$5":"0",  "$6":"0",  "$7":"0",  "$8":"0",  "$9":"0",  "$10":"0",
 "$11":"0",  "$12":"0",  "$13":"0",  "$14":"0",  "$15":"0",  "$16":"0",
 "$17":"0",  "$18":"0",  "$19":"0",  "$20":"0",  "$21":"0",  "$22":"0",
@@ -50,6 +50,10 @@ def decimalParaBinario(num):
         return bin(num)[2:]
     else:
         return '1' + bin(2147483648 + num)[2:]
+
+def binarioParaDecimal(binario):
+    decimal = str(int(binario, 2)) if len(binario) < 32 or binario[0] != '1' else str(int(binario[1:], 2) - 2147483648)
+    return decimal
 
 def defineTipo(binario): # devolve um char com o tipo de operação do hexadecimal(r, i, j, s)
     tipo = "rs"
@@ -86,13 +90,18 @@ def escreveCodigo(binario, tipo):
         elif func in ("sll", "srl", "sra"): # caso o func seja um desses
             registrador1, registrador2, numero = str(int(binario[16:21], 2)), str(int(binario[11:16], 2)), int(binario[21:26], 2)
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', ' + str(numero)
+            # vvvvvvvvvvvvvvvvvvvvvvvvvvv
+            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, numero = numero)
         elif func in ("sllv", "srlv", "srav"): # caso o func seja um desses
             registrador1, registrador2, registrador3 = str(int(binario[16:21], 2)), str(int(binario[11:16], 2)), str(int(binario[6:11], 2))
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', $' + registrador3
+            # vvvvvvvvvvvvvvvvvvvvvvvvvvv
+            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3) # <<<<<<<<<<<<<<<<<<<<
         else: # caso o func nao seja nenhum dos acima (ou seja, func eh dos que usam tres registradores, como 'add' ou 'sub')
             registrador1, registrador2, registrador3 = str(int(binario[16:21], 2)), str(int(binario[6:11], 2)), str(int(binario[11:16], 2))
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', $' + registrador3
-            #operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3)
+            # vvvvvvvvvvvvvvvvvvvvvvvvvvv
+            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3)
             operacaoLogica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3)
 
     elif tipo == 'ij': # caso o comando seja do tipo 'i' ou 'j'
@@ -101,6 +110,8 @@ def escreveCodigo(binario, tipo):
         if func == "lui": # caso o func seja 'lui'
             registrador, numero = str(int(binario[11:16], 2)), int(binario[16:32], 2) # registrador eh igual a sequencia binaria do 11 bit ao 16 bit. numero vai ser o resto da sequencia binaria
             codigo = func + ' $' + registrador + ', ' + str(numero)
+            # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+            operacaoAritmetica(func, '$' + registrador, numero = numero)
         elif func == "bltz": # caso o func seja 'bltz'
             registrador = str(int(binario[6:11], 2))
             codigo = func + ' $' + registrador + ', start'
@@ -123,8 +134,9 @@ def escreveCodigo(binario, tipo):
 
     return codigo
 
+###########################################################################################################################################
 #funcao que vai realizar a operacao aritmetica especificada pelo codigo e armazenar o resultado nos registradores especificos
-def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '', numero = 0):
+def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '', numero = None):
     if func == "add":
         registradores[registrador1] = str( int(registradores[registrador2]) + int(registradores[registrador3]))
         
@@ -133,6 +145,81 @@ def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '',
         
     if func == "addi":
         registradores[registrador1] = str( int(registradores[registrador2]) + numero)
+
+    if func == "lui":
+        binNumero = decimalParaBinario(numero) + ( '0' * 16 )
+        registradores[registrador1] =binarioParaDecimal(binNumero)
+        imprimeRegistradores()
+
+    if func == "sll":
+        binReg2 = decimalParaBinario( int(registradores[registrador2]) )
+        binReg2 = binReg2 + (numero * '0')
+        binReg2 = binReg2[(len(binReg2)) - 32:] if len(binReg2) > 32 else binReg2
+        registradores[registrador1] = binarioParaDecimal(binReg2)
+
+    if func == "srl":
+        binReg2 = decimalParaBinario(int(registradores[registrador2]))
+        binReg2 = ('0' * numero) + binReg2
+        binReg2 = binReg2[:-numero] if numero != 0 else binReg2
+        registradores[registrador1] = binarioParaDecimal(binReg2)
+
+    if func == "sra":
+        binReg2 = decimalParaBinario(int(registradores[registrador2]))
+        if int( registradores[registrador2] ) >= 0:
+            binReg2 = ('0' * numero) + binReg2
+            binReg2 = binReg2[:-numero] if numero != 0 else binReg2
+            registradores[registrador1] = binarioParaDecimal(binReg2)
+        else:
+            binReg2 = ('1' * numero) + binReg2
+            binReg2 = binReg2[:-numero] if numero != 0 else binReg2
+            registradores[registrador1] = binarioParaDecimal(binReg2)
+
+    if func == "sllv":
+        pulo = int( registradores[registrador3] )
+        binReg2 = decimalParaBinario(int(registradores[registrador2]))
+        if pulo >= 0:
+            binReg2 = binReg2 + ( (pulo % 32) * '0' )
+            binReg2 = binReg2[(len(binReg2)) - 32:] if len(binReg2) > 32 else binReg2
+            registradores[registrador1] = binarioParaDecimal(binReg2)
+        else:
+            binReg2 = binReg2[pulo:] + ((32 + pulo) * '0')
+            binReg2 = binReg2[(len(binReg2)) - 32:] if len(binReg2) > 32 else binReg2
+            registradores[registrador1] = binarioParaDecimal(binReg2)
+
+    if func == "srlv":
+        pulo = int( registradores[registrador3] )
+        binReg2 = decimalParaBinario(int(registradores[registrador2]))
+        if (pulo % 32) >= 0:
+            binReg2 = ('0' * (pulo % 32)) + binReg2
+            binReg2 = binReg2[: -(pulo % 32) ] if (pulo % 32) != 0 else binReg2
+            registradores[registrador1] = binarioParaDecimal(binReg2)
+        else:
+            binReg2 = ( '0' * (32 - (pulo % 32)) ) + binReg2
+            binReg2 = binReg2[:-(pulo % 32)] if (pulo % 32) != 0 else binReg2
+            registradores[registrador1] = binarioParaDecimal(binReg2)
+
+    if func == "srav":
+        pulo = int( registradores[registrador3] )
+        binReg2 = decimalParaBinario(int(registradores[registrador2]))
+        if (pulo % 32) >= 0:
+            if int(registradores[registrador2]) >= 0:
+                binReg2 = ('0' * (pulo % 32)) + binReg2
+                binReg2 = binReg2[:-(pulo % 32)] if (pulo % 32) != 0 else binReg2
+                registradores[registrador1] = binarioParaDecimal(binReg2)
+            else:
+                binReg2 = ('1' * (pulo % 32)) + binReg2
+                binReg2 = binReg2[:-(pulo % 32)] if (32 % pulo) != 0 else binReg2
+                registradores[registrador1] = binarioParaDecimal(binReg2)
+        else:
+            if int(registradores[registrador2]) >= 0:
+                binReg2 = ('0' * ( 32 - (pulo % 32)) ) + binReg2
+                binReg2 = binReg2[ :(32 - (32 % pulo)) ] if (32 - (32 % pulo)) != 0 else binReg2
+                registradores[registrador1] = binarioParaDecimal(binReg2)
+            else:
+                binReg2 = ('1' * (32 - (32 % pulo))) + binReg2
+                binReg2 = binReg2[ :- (32 - (32 % pulo)) ] if (32 - (32 % pulo)) != 0 else binReg2
+                registradores[registrador1] = binarioParaDecimal(binReg2)
+
 
 # funcao que recebe o primeiro registrador e os demais dados(se necessario), e realiza as operacoes logicas acesseando e armazenando
 # em registradores
