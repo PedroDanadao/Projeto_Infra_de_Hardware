@@ -1,5 +1,6 @@
 
-HEXA = "0x3c010002"
+
+HEXA = "0x00620806"
 
 tipoR = {"100000":"add", "100010":"sub",
 "101010":"slt", "100100":"and", "100101":"or", "100110":"xor",
@@ -54,6 +55,9 @@ def decimalParaBinario(num):
 def binarioParaDecimal(binario):
     decimal = str(int(binario, 2)) if len(binario) < 32 or binario[0] != '1' else str(int(binario[1:], 2) - 2147483648)
     return decimal
+
+def armazenaRegistradores(registrador, binario):
+    registradores[registrador] = binarioParaDecimal(binario)
 
 def defineTipo(binario): # devolve um char com o tipo de operação do hexadecimal(r, i, j, s)
     tipo = "rs"
@@ -137,6 +141,17 @@ def escreveCodigo(binario, tipo):
 ###########################################################################################################################################
 #funcao que vai realizar a operacao aritmetica especificada pelo codigo e armazenar o resultado nos registradores especificos
 def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '', numero = None):
+    if registrador2 != '':
+        binReg2 = decimalParaBinario( int(registradores[registrador2]) )
+
+    if registrador3 != '':
+        binReg3 = decimalParaBinario( int(registradores[registrador3]) )
+        pulo = int( registradores[registrador3] )
+
+    if numero != None:
+        binNumero = decimalParaBinario( numero )
+
+    
     if func == "add":
         registradores[registrador1] = str( int(registradores[registrador2]) + int(registradores[registrador3]))
         
@@ -156,77 +171,35 @@ def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '',
         registradores[registrador1] = str(int(registradores[registrador2]) + numero)
 
     if func == "lui":
-        binNumero = decimalParaBinario(numero) + ( '0' * 16 )
-        registradores[registrador1] =binarioParaDecimal(binNumero)
+        binNumero = binNumero + ( '0' * 16 ) # adiciona 16 zeros a direita do binario do numero recebido
+        registradores[registrador1] = binarioParaDecimal(binNumero) # armazena o resultado no registrador
 
-    if func == "sll":
-        binReg2 = decimalParaBinario( int(registradores[registrador2]) )
-        binReg2 = binReg2 + (numero * '0')
-        binReg2 = binReg2[(len(binReg2)) - 32:] if len(binReg2) > 32 else binReg2
-        registradores[registrador1] = binarioParaDecimal(binReg2)
+    if func == "sll": # move o valor binario do registrador 2 um certo numero de vezez (numero) para a esquerda e armazena o resultado no registrador 1
+        binSSL = instrucaoSLL(binReg2, numero)
+        armazenaRegistradores(registrador1, binSSL)
 
-    if func == "srl":
-        binReg2 = decimalParaBinario(int(registradores[registrador2]))
-        binReg2 = ('0' * numero) + binReg2
-        binReg2 = binReg2[:-numero] if numero != 0 else binReg2
-        registradores[registrador1] = binarioParaDecimal(binReg2)
+    if func == "srl": # move o valor binario do registrador 2 um certo numero de vezez (numero) para a direita e armazena o resultado no registrador 1
+        binSRL = instrucaoSRL(binReg2, numero)
+        armazenaRegistradores(registrador1, binSRL)
 
-    if func == "sra":
-        binReg2 = decimalParaBinario(int(registradores[registrador2]))
-        if int( registradores[registrador2] ) >= 0:
-            binReg2 = ('0' * numero) + binReg2
-            binReg2 = binReg2[:-numero] if numero != 0 else binReg2
-            registradores[registrador1] = binarioParaDecimal(binReg2)
-        else:
-            binReg2 = ('1' * numero) + binReg2
-            binReg2 = binReg2[:-numero] if numero != 0 else binReg2
-            registradores[registrador1] = binarioParaDecimal(binReg2)
+    if func == "sra": # mesma coisa do srl, porem preenche com 0 ou com 1 dependendo do sinal do numero passado
+        binSRA = instrucaoSRA(binReg2, numero)
+        armazenaRegistradores(registrador1, binSRA)
 
+    # fazem o mesmo que as instrucoes de cima, porem ao inves de receberem um numero direto da instrucao
+    # recebem o registrador que o numero vai estar. isso faz com que seja preciso lidar com casos em que o numero no
+    # registrador seja maior que 32 ou menor que 0
     if func == "sllv":
-        pulo = int( registradores[registrador3] )
-        binReg2 = decimalParaBinario(int(registradores[registrador2]))
-        if pulo >= 0:
-            binReg2 = binReg2 + ( (pulo % 32) * '0' )
-            binReg2 = binReg2[(len(binReg2)) - 32:] if len(binReg2) > 32 else binReg2
-            registradores[registrador1] = binarioParaDecimal(binReg2)
-        else:
-            binReg2 = binReg2[pulo:] + ((32 + pulo) * '0')
-            binReg2 = binReg2[(len(binReg2)) - 32:] if len(binReg2) > 32 else binReg2
-            registradores[registrador1] = binarioParaDecimal(binReg2)
+        binSLLV = instrucaoSLL( binReg2, (pulo % 32) )
+        armazenaRegistradores(registrador1, binSLLV)
 
     if func == "srlv":
-        pulo = int( registradores[registrador3] )
-        binReg2 = decimalParaBinario(int(registradores[registrador2]))
-        if (pulo % 32) >= 0:
-            binReg2 = ('0' * (pulo % 32)) + binReg2
-            binReg2 = binReg2[: -(pulo % 32) ] if (pulo % 32) != 0 else binReg2
-            registradores[registrador1] = binarioParaDecimal(binReg2)
-        else:
-            binReg2 = ( '0' * (32 - (pulo % 32)) ) + binReg2
-            binReg2 = binReg2[:-(pulo % 32)] if (pulo % 32) != 0 else binReg2
-            registradores[registrador1] = binarioParaDecimal(binReg2)
+        binSRLV = instrucaoSRL(binReg2, (pulo % 32))
+        armazenaRegistradores(registrador1, binSRLV)
 
     if func == "srav":
-        pulo = int( registradores[registrador3] )
-        binReg2 = decimalParaBinario(int(registradores[registrador2]))
-        if (pulo % 32) >= 0:
-            if int(registradores[registrador2]) >= 0:
-                binReg2 = ('0' * (pulo % 32)) + binReg2
-                binReg2 = binReg2[:-(pulo % 32)] if (pulo % 32) != 0 else binReg2
-                registradores[registrador1] = binarioParaDecimal(binReg2)
-            else:
-                binReg2 = ('1' * (pulo % 32)) + binReg2
-                binReg2 = binReg2[:-(pulo % 32)] if (32 % pulo) != 0 else binReg2
-                registradores[registrador1] = binarioParaDecimal(binReg2)
-        else:
-            if int(registradores[registrador2]) >= 0:
-                binReg2 = ('0' * ( 32 - (pulo % 32)) ) + binReg2
-                binReg2 = binReg2[ :(32 - (32 % pulo)) ] if (32 - (32 % pulo)) != 0 else binReg2
-                registradores[registrador1] = binarioParaDecimal(binReg2)
-            else:
-                binReg2 = ('1' * (32 - (32 % pulo))) + binReg2
-                binReg2 = binReg2[ :- (32 - (32 % pulo)) ] if (32 - (32 % pulo)) != 0 else binReg2
-                registradores[registrador1] = binarioParaDecimal(binReg2)
+        binSRAV = instrucaoSRA(binReg2, (pulo % 32))
+        armazenaRegistradores(registrador1, binSRAV)
 
 
 # funcao que recebe o primeiro registrador e os demais dados(se necessario), e realiza as operacoes logicas acesseando e armazenando
@@ -252,69 +225,93 @@ def operacaoLogica(func, registrador1, registrador2 = '', registrador3 = '', num
 
 
     if func == "and": # and bit a bit
-        listaAndBinario = [] # cria uma lista para armazenar a operacao binaria de and
-        for i in range(maior):
-            listaAndBinario.append( str(int(binReg2[i]) and int(binReg3[i])) ) # lista vai armazenandoo and bit a bit
-        andBinario = ''.join(listaAndBinario) # variavel que armazena uma string da lista anterior
-
-        # armazena o andBinario em decimal (lida com binarios negativos tambem)
-        registradores[registrador1] = str( int(andBinario, 2) ) if len(andBinario) != 32 or andBinario[0] == '0' else str( int(andBinario[1:], 2) -  2147483648)
+        andBaB = instrucaoAnd(binReg2, binReg3)
+        armazenaRegistradores(registrador1, andBaB)
 
     if func == "or": # or bit a bit
-        listaOrBinario = [] # cria uma lista para armazenar a operacao binaria de or
-        for i in range(maior):
-            listaOrBinario.append(str( int(binReg2[i]) or int(binReg3[i])) ) # realiza a operacao de or bit a bit e armazena na lista
-        orBinario = ''.join(listaOrBinario) # variavel que armazena uma string do conteudo da lista
-
-        # armazena orBinario, em decimal, no registrador1 (tambem lida com binarios negativos)
-        registradores[registrador1] = str(int(orBinario, 2)) if len(orBinario) != 32 or orBinario[0] == '0' else str( int(orBinario[1:], 2) - 2147483648 )
+        orBaB = instrucaoOr(binReg2, binReg3)
+        armazenaRegistradores(registrador1, orBaB)
 
     if func == "xor": # xor bit a bit (bit != bit => 1  /  bit == bit => 0)
-        listaXorBinario = [] # cria uma lista para armazenar a operacao binaria de xor
-        for i in range(maior):
-            listaXorBinario.append( '0' if binReg2[i] == binReg3[i] else '1' )  # realiza a operacao de xor bit a bit e armazena na lista
-        xorBinario = ''.join(listaXorBinario)  # variavel que armazena uma string do conteudo da lista
 
-        # armazena xorBinario, em decimal, no registrador1 (tambem lida com binarios negativos)
-        registradores[registrador1] = str(int(xorBinario, 2)) if len(xorBinario) != 32 or xorBinario[0] == '0' else str( int(xorBinario[1:], 2) - 2147483648 )
+        xorBaB = instrucaoXor(binReg2, binReg3)
+        armazenaRegistradores(registrador1, xorBaB)
 
     if func == "nor": # nor bit a bit (not or)
-        listaNorBinario = [] # cria uma lista para armazenar a operacao binaria de nor
-        binReg2, binReg3 = ('0' * (32 - len(binReg2))) + binReg2, ( '0' * (32 - len(binReg3)) + binReg3 ) # nesse caso temos que analizar todos os 32 bits
+        norBaB = instrucaoNor(binReg2, binReg3)
+        armazenaRegistradores(registrador1, norBaB)
 
-        for i in range(32):
-            listaNorBinario.append( '0' if int( binReg2[i] ) or int( binReg3[i] ) else '1' )  # realiza a operacao de nor bit a bit e armazena na lista
-        norBinario = ''.join(listaNorBinario)  # variavel que armazena uma string do conteudo da lista
-
-        # armazena norBinario, em decimal, no registrador1 (tambem lida com binarios negativos)
-        registradores[registrador1] = str(int(norBinario, 2)) if len(norBinario) != 32 or norBinario[0] == '0' else str( int(norBinario[1:], 2) - 2147483648 )
-
-    if func == "andi":
-        listaAndIBinario = []  # cria uma lista para armazenar a operacao binaria de andi
-        for i in range(maior):
-            listaAndIBinario.append( str(int(binReg2[i]) and int(binNum[i])) )  # lista vai armazenandoo and bit a bit
-        andiBinario = ''.join(listaAndIBinario)  # variavel que armazena uma string da lista anterior
-
-        # armazena o andiBinario em decimal (lida com binarios negativos tambem)
-        registradores[registrador1] = str(int(andiBinario, 2)) if len(andiBinario) != 32 or andiBinario[0] == '0' else str( int(andiBinario[1:], 2) - 2147483648 )
+    if func == "andi": 
+        andiBaB = instrucaoAnd(binReg2, binNum)
+        armazenaRegistradores(registrador1, andiBaB)
 
     if func == "ori":
-        listaOrIBinario = []  # cria uma lista para armazenar a operacao binaria de ori
-        for i in range(maior):
-            listaOrIBinario.append( str(int(binReg2[i]) or int(binNum[i])) )  # realiza a operacao de or bit a bit e armazena na lista
-        oriBinario = ''.join(listaOrIBinario)  # variavel que armazena uma string da lista anterior
-
-        # armazena o oriBinario em decimal (lida com binarios negativos tambem)
-        registradores[registrador1] = str(int(oriBinario, 2)) if len(oriBinario) != 32 or oriBinario[0] == '0' else str( int(oriBinario[1:], 2) - 2147483648 )
+        oriBaB = instrucaoOr(binReg2, binNum)
+        armazenaRegistradores(registrador1, oriBaB)
 
     if func == "xori":
-        listaXorIBinario = []  # cria uma lista para armazenar a operacao binaria de andi
-        for i in range(maior):
-            listaXorIBinario.append( '0' if binReg2[i] == binNum[i] else '1' )  # realiza a operacao de xor bit a bit e armazena na lista
-        xoriBinario = ''.join(listaXorIBinario)  # variavel que armazena uma string da lista anterior
+        xoriBaB = instrucaoXor(binReg2, binNum)
+        armazenaRegistradores(registrador1, xoriBaB)
 
-        # armazena o xoriBinario em decimal (lida com binarios negativos tambem)
-        registradores[registrador1] = str( int(xoriBinario, 2) ) if len(xoriBinario) != 32 or xoriBinario[0] == '0' else str( int(xoriBinario[1:], 2) - 2147483648 )
+
+def instrucaoSLL(binario, numero):
+    binario = binario + (numero * '0') # preenche o binario com zeros a direita
+    binario = binario[(len(binario)) - 32:] if len(binario) > 32 else binario # pega os 32 primeiros bits do binario
+    return binario
+
+def instrucaoSRL(binario, numero):
+    binario = ('0' * numero) + binario # preenche o binario com zeros a esquerda
+    binario = binario[:-numero] if numero != 0 else binario
+    return binario
+
+def instrucaoSRA(binario, numero): # preenche o binario com zeros a esquerda
+    if len(binario) < 32 or binario[0] == '0': 
+        binario = instrucaoSRL(binario, numero)
+        return binario
+    else:
+        binario = ('1' * numero) + binario # preenche o binario com uns a esquerda
+        binario = binario[:-numero] if numero != 0 else binario
+        return binario
+
+
+def instrucaoAnd(binario1, binario2):
+    listaAndBinario = [] # cria uma lista para armazenar a operacao binaria de and
+    for i in range( len(binario1) ):
+        listaAndBinario.append( str(int(binario1[i]) and int(binario2[i])) ) # lista vai armazenandoo and bit a bit
+    andBinario = ''.join(listaAndBinario) # variavel que armazena uma string da lista anterior
+
+    # armazena o andBinario
+    return andBinario
+
+def instrucaoOr(binario1, binario2):
+    listaOrBinario = [] # cria uma lista para armazenar a operacao binaria de or
+    for i in range(len(binario1)):
+        listaOrBinario.append(str( int(binario1[i]) or int(binario2[i])) ) # realiza a operacao de or bit a bit e armazena na lista
+    orBinario = ''.join(listaOrBinario) # variavel que armazena uma string do conteudo da lista
+
+    # devolve orBinario
+    return orBinario
+
+def instrucaoXor(binario1, binario2):
+    listaXorBinario = [] # cria uma lista para armazenar a operacao binaria de xor
+    for i in range(len(binario1)):
+        listaXorBinario.append( '0' if binario1[i] == binario2[i] else '1' )  # realiza a operacao de xor bit a bit e armazena na lista
+    xorBinario = ''.join(listaXorBinario)  # variavel que armazena uma string do conteudo da lista
+
+    # devolve xorBinario
+    return xorBinario
+
+def instrucaoNor(binario1, binario2):
+    listaNorBinario = [] # cria uma lista para armazenar a operacao binaria de xor
+    binario1, binario2 = ('0' * (32 - len(binario1)) + binario1), ('0' * (32 - len(binario2)) + binario2) # completa os dois binarios com 0 a esquerda
+    orBinario = instrucaoOr(binario1, binario2) # armazena o or entre os dois binarios
+
+    for i in orBinario: # percorre o orBinario
+        listaNorBinario.append('0' if i == '1' else '1') # inverte cada bit do orBinario (transformando ele num nor)
+    norBinario = ''.join(listaNorBinario) # armazena a lista em norBinario no formato de string
+
+    #devolve norBinario
+    return norBinario
 
 
 # imprime os registradores na ordem
@@ -322,9 +319,11 @@ def devolveRegistradores():
     listaRegistradores = []
 
     for i in range(31):
-        listaRegistradores.append("$" + str(i) + " = " + registradores["$" + str(i)] + '; ')
-    listaRegistradores.append("$31 = " + registradores["$31"] + ";")
+        listaRegistradores.append("$" + str(i) + "=" + registradores["$" + str(i)] + ';')
+    listaRegistradores.append("$31=" + registradores["$31"] + ";")
 
     return ''.join(listaRegistradores)
 
+
 main()
+
