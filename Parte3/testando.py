@@ -273,7 +273,7 @@ def operacaoLogica(func, registrador1, registrador2, registrador3, numero):
 
 def operacaoDePulo(expressao, posicao):
     if ('j ' or 'jal ') in expressao:
-        pulo = expressao.split[1]
+        pulo = int( expressao.split()[1] )
         posicao = pulo
     elif ('bne ') in expressao:
         reg1 = expressao.split()[1].strip(',')

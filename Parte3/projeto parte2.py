@@ -1,6 +1,5 @@
 
-
-HEXA = "0x00620806"
+HEXA = "0x04400001"
 
 tipoR = {"100000":"add", "100010":"sub",
 "101010":"slt", "100100":"and", "100101":"or", "100110":"xor",
@@ -23,15 +22,30 @@ registradores = {"$0":"0",  "$1":"0",  "$2":"0",  "$3":"0",  "$4":"0",
 "$23":"0",  "$24":"0",  "$25":"0",  "$26":"0",  "$27":"0",  "$28":"0",
 "$29":"0",  "$30":"0",  "$31":"0"}
 
+
 def main():
     '''binario = converteParaBinario(HEXA) # converte o hexadecimal recebido para binario
     tipo = defineTipo(binario) # pega o tipo de codigo do hexadecimal(r, i, j, s)
-    escreveCodigo(binario, tipo) # escreve o codigo na tela'''
-    with open("entrada.txt") as entrada, open("saida.txt", 'w') as saida:
+    print( escreveCodigo(binario, tipo) ) # escreve o codigo na tela'''
+    #print(devolveRegistradores())
+    with open("entrada2.txt") as entrada, open("saida2.txt", 'w') as saida:
+        comandos = []
         for linha in entrada.readlines():
-            binario = converteParaBinario(linha) # converte o hexadecimal da linha para binario
+            comandos.append(linha)
+        
+        i = 0
+        cont = 0
+        while i < len(comandos) and cont < 15:
+            binario = converteParaBinario(comandos[i]) # converte o hexadecimal da linha para binario
             tipo = defineTipo(binario) # pega o tipo de codigo do hexadecimal(r, i, j, s)
-            print(escreveCodigo(binario, tipo), file = saida) # escreve o codigo no arquivo de saida'''
+            comando_atual = escreveCodigo(binario, tipo, executar = True)
+            if ('j ' in comando_atual) or ('jal ' in comando_atual) or ('beq ' in comando_atual) or ('bne ' in comando_atual) or ('bltz ' in comando_atual) or ('jr ' in comando_atual) or ('sb ' in comando_atual) or ('lb ' in comando_atual) or ('sw ' in comando_atual) or ('lw ' in comando_atual) or ('lbu ' in comando_atual):
+                i = operacaoDePulo(comando_atual, i)
+            else: i += 1
+            cont += 1
+            
+            print(comando_atual)
+            print(comando_atual, file = saida) # escreve o codigo no arquivo de saida'''
             print(devolveRegistradores(), file = saida)
             
 
@@ -72,7 +86,7 @@ def defineTipo(binario): # devolve um char com o tipo de operação do hexadecim
         return 'r'# caso nao seja tipo 's'
     return 'ij'# caso nao seja nem 's' nem 'r'
 
-def escreveCodigo(binario, tipo):
+def escreveCodigo(binario, tipo, executar = False):
     codigo = ''
 
     if tipo == 's': # caso o comando seja do tipo 's'
@@ -94,19 +108,15 @@ def escreveCodigo(binario, tipo):
         elif func in ("sll", "srl", "sra"): # caso o func seja um desses
             registrador1, registrador2, numero = str(int(binario[16:21], 2)), str(int(binario[11:16], 2)), int(binario[21:26], 2)
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', ' + str(numero)
-            # vvvvvvvvvvvvvvvvvvvvvvvvvvv
-            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, numero = numero)
+            executaComandos(func, executar, registrador1 = '$' + registrador1, registrador2 = '$' + registrador2, numero = numero)
         elif func in ("sllv", "srlv", "srav"): # caso o func seja um desses
             registrador1, registrador2, registrador3 = str(int(binario[16:21], 2)), str(int(binario[11:16], 2)), str(int(binario[6:11], 2))
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', $' + registrador3
-            # vvvvvvvvvvvvvvvvvvvvvvvvvvv
-            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3)
+            executaComandos(func, executar, registrador1 = '$' + registrador1, registrador2 = '$' + registrador2, registrado3 = '$' + registrador3)
         else: # caso o func nao seja nenhum dos acima (ou seja, func eh dos que usam tres registradores, como 'add' ou 'sub')
             registrador1, registrador2, registrador3 = str(int(binario[16:21], 2)), str(int(binario[6:11], 2)), str(int(binario[11:16], 2))
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', $' + registrador3
-            # vvvvvvvvvvvvvvvvvvvvvvvvvvv
-            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3)
-            operacaoLogica(func, '$' + registrador1, '$' + registrador2, '$' + registrador3)
+            executaComandos(func, executar, registrador1 = '$' + registrador1, registrador2 = '$' + registrador2, registrador3 = '$' + registrador3)
 
     elif tipo == 'ij': # caso o comando seja do tipo 'i' ou 'j'
         func = tipoIJ[ binario[:6] ]
@@ -114,33 +124,40 @@ def escreveCodigo(binario, tipo):
         if func == "lui": # caso o func seja 'lui'
             registrador, numero = str(int(binario[11:16], 2)), int(binario[16:32], 2) # registrador eh igual a sequencia binaria do 11 bit ao 16 bit. numero vai ser o resto da sequencia binaria
             codigo = func + ' $' + registrador + ', ' + str(numero)
-            # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-            operacaoAritmetica(func, '$' + registrador, numero = numero)
+            executaComandos(func, executar, registrador1 = '$' + registrador, numero = numero)
         elif func == "bltz": # caso o func seja 'bltz'
-            registrador = str(int(binario[6:11], 2))
-            codigo = func + ' $' + registrador + ', start'
+            registrador, numero = str(int(binario[6:11], 2)), int(binario[17:32], 2)
+            numero = numero - 32768 if binario[16] == '1' else numero
+            codigo = func + ' $' + registrador + ', ' + str(numero)
         elif func in ("addi", "slti", "andi", "ori", "xori", "addiu"): # se func for um desses
             registrador1, registrador2, numero = str(int(binario[11:16], 2)), str(int(binario[6:11], 2)), int(binario[17:32], 2) # dessa vez ele conta do 17 bit ao fim, pois o 16 vai servir pra checar se o numero eh negativo
             numero = numero - 32768 if binario[16] == '1' else numero # caso o numero seja negativo, ele vai ser: numero - 32768. mais em https://www.youtube.com/watch?v=ZwRfnmXY7VY
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', ' + str(numero)
-            operacaoAritmetica(func, '$' + registrador1, '$' + registrador2, numero = numero)
-            operacaoLogica(func, '$' + registrador1, '$' + registrador2, numero = numero)
+            executaComandos(func, executar, registrador1 = '$' + registrador1, registrador2 = '$' + registrador2, numero = numero)
             
         elif func in ("lw", "sw", "lb", "lbu", "sb"):
             registrador1, registrador2, numero = str(int(binario[11:16], 2)), str(int(binario[6:11], 2)), int(binario[17:32], 2) # dessa vez ele conta do 17 bit ao fim, pois o 16 vai servir pra checar se o numero eh negativo
             numero = numero - 32768 if binario[16] == '1' else numero # caso o numero seja negativo, ele vai ser: numero - 32768. mais em https://www.youtube.com/watch?v=ZwRfnmXY7VY
             codigo = func + ' $' + registrador1 + ', ' + str(numero) + '($' + registrador2 + ')'
         elif func in ("beq", "bne"):
-            registrador1, registrador2 = str(int(binario[6:11], 2)), str(int(binario[11:16], 2))
-            codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', start'
+            registrador1, registrador2, numero = str(int(binario[6:11], 2)), str(int(binario[11:16], 2)), int(binario[17:32], 2)
+            numero = numero - 32768 if binario[16] == '1' else numero
+            codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', ' + str(numero)
         elif func in ("j", "jal"):
-            codigo = func + ' start'
+            numero = int(binario[12:32], 2)
+            codigo = func + ' ' + str(numero)
 
     return codigo
 
+def executaComandos(func, executar, registrador1 = '', registrador2 = '', registrador3 = '', numero = None):
+    if executar:
+        operacaoAritmetica(func, registrador1, registrador2, registrador3, numero)
+        operacaoLogica(func, registrador1, registrador2, registrador3, numero)
+        
+    
 ###########################################################################################################################################
 #funcao que vai realizar a operacao aritmetica especificada pelo codigo e armazenar o resultado nos registradores especificos
-def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '', numero = None):
+def operacaoAritmetica(func, registrador1, registrador2, registrador3, numero):
     if registrador2 != '':
         binReg2 = decimalParaBinario( int(registradores[registrador2]) )
 
@@ -204,7 +221,7 @@ def operacaoAritmetica(func, registrador1, registrador2 = '', registrador3 = '',
 
 # funcao que recebe o primeiro registrador e os demais dados(se necessario), e realiza as operacoes logicas acesseando e armazenando
 # em registradores
-def operacaoLogica(func, registrador1, registrador2 = '', registrador3 = '', numero = None):
+def operacaoLogica(func, registrador1, registrador2, registrador3, numero):
     # caso seja uma operacao que mecha com os 3 registradores
     if registrador2 != '' and registrador3 != '':
         # cria duas variaveis que recebem o valor contido no segundo e terceiro registradores especificados
@@ -252,6 +269,34 @@ def operacaoLogica(func, registrador1, registrador2 = '', registrador3 = '', num
     if func == "xori":
         xoriBaB = instrucaoXor(binReg2, binNum)
         armazenaRegistradores(registrador1, xoriBaB)
+
+
+def operacaoDePulo(expressao, posicao):
+    if ('j ' or 'jal ') in expressao:
+        pulo = int( expressao.split()[1] )
+        posicao = pulo
+    elif ('bne ') in expressao:
+        reg1 = expressao.split()[1].strip(',')
+        reg2 = expressao.split()[2].strip(',')
+        pulo = int( expressao.split()[3] ) + 1
+        if registradores[reg1] != registradores[reg2]:
+            posicao = posicao + pulo
+        else: posicao += 1
+    elif ('beq ') in expressao:
+        reg1 = expressao.split()[1].strip(',')
+        reg2 = expressao.split()[2].strip(',')
+        pulo = int( expressao.split()[3] ) + 1
+        if registradores[reg1] == registradores[reg2]:
+            posicao = posicao + pulo
+        else: posicao += 1
+    elif ('bltz ') in expressao:
+        reg = expressao.split()[1].strip(',')
+        pulo = int( expressao.split()[2] ) + 1
+        if int(registradores[reg]) < 0:
+            posicao = posicao + pulo
+        else: posicao += 1
+        
+    return posicao
 
 
 def instrucaoSLL(binario, numero):
@@ -319,11 +364,10 @@ def devolveRegistradores():
     listaRegistradores = []
 
     for i in range(31):
-        listaRegistradores.append("$" + str(i) + "=" + registradores["$" + str(i)] + ';')
-    listaRegistradores.append("$31=" + registradores["$31"] + ";")
+        listaRegistradores.append("$" + str(i) + " = " + registradores["$" + str(i)] + '; ')
+    listaRegistradores.append("$31 = " + registradores["$31"] + ";")
 
     return ''.join(listaRegistradores)
 
 
 main()
-
