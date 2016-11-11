@@ -22,6 +22,8 @@ registradores = {"$0":"0",  "$1":"0",  "$2":"0",  "$3":"0",  "$4":"0",
 "$23":"0",  "$24":"0",  "$25":"0",  "$26":"0",  "$27":"0",  "$28":"0",
 "$29":"0",  "$30":"0",  "$31":"0"}
 
+memoria = {}
+
 
 def main():
     '''binario = converteParaBinario(HEXA) # converte o hexadecimal recebido para binario
@@ -39,14 +41,14 @@ def main():
             binario = converteParaBinario(comandos[i]) # converte o hexadecimal da linha para binario
             tipo = defineTipo(binario) # pega o tipo de codigo do hexadecimal(r, i, j, s)
             comando_atual = escreveCodigo(binario, tipo, executar = True)
-            if ('j ' in comando_atual) or ('jal ' in comando_atual) or ('beq ' in comando_atual) or ('bne ' in comando_atual) or ('bltz ' in comando_atual) or ('jr ' in comando_atual) or ('sb ' in comando_atual) or ('lb ' in comando_atual) or ('sw ' in comando_atual) or ('lw ' in comando_atual) or ('lbu ' in comando_atual):
+            if ('j ' in comando_atual) or ('jal ' in comando_atual) or ('beq ' in comando_atual) or ('bne ' in comando_atual) or ('bltz ' in comando_atual) or ('jr ' in comando_atual):
                 i = operacaoDePulo(comando_atual, i)
             else: i += 1
             cont += 1
             
-            print(comando_atual)
-            print(comando_atual, file = saida) # escreve o codigo no arquivo de saida'''
-            print(devolveRegistradores(), file = saida)
+            '''print(comando_atual)
+            print(comando_atual, file = saida) # escreve o codigo no arquivo de saida
+            print(devolveRegistradores(), file = saida)'''
             
 
 def converteParaBinario(hexa):
@@ -134,11 +136,11 @@ def escreveCodigo(binario, tipo, executar = False):
             numero = numero - 32768 if binario[16] == '1' else numero # caso o numero seja negativo, ele vai ser: numero - 32768. mais em https://www.youtube.com/watch?v=ZwRfnmXY7VY
             codigo = func + ' $' + registrador1 + ', $' + registrador2 + ', ' + str(numero)
             executaComandos(func, executar, registrador1 = '$' + registrador1, registrador2 = '$' + registrador2, numero = numero)
-            
         elif func in ("lw", "sw", "lb", "lbu", "sb"):
             registrador1, registrador2, numero = str(int(binario[11:16], 2)), str(int(binario[6:11], 2)), int(binario[17:32], 2) # dessa vez ele conta do 17 bit ao fim, pois o 16 vai servir pra checar se o numero eh negativo
             numero = numero - 32768 if binario[16] == '1' else numero # caso o numero seja negativo, ele vai ser: numero - 32768. mais em https://www.youtube.com/watch?v=ZwRfnmXY7VY
             codigo = func + ' $' + registrador1 + ', ' + str(numero) + '($' + registrador2 + ')'
+            executaComandos(func, executar, registrador1 = '$' + registrador1, registrador2 = '$' + registrador2, numero = numero)
         elif func in ("beq", "bne"):
             registrador1, registrador2, numero = str(int(binario[6:11], 2)), str(int(binario[11:16], 2)), int(binario[17:32], 2)
             numero = numero - 32768 if binario[16] == '1' else numero
@@ -153,6 +155,7 @@ def executaComandos(func, executar, registrador1 = '', registrador2 = '', regist
     if executar:
         operacaoAritmetica(func, registrador1, registrador2, registrador3, numero)
         operacaoLogica(func, registrador1, registrador2, registrador3, numero)
+        instrucoesDeMemoria(func, registrador1, registrador2, numero)
         
     
 ###########################################################################################################################################
@@ -297,6 +300,43 @@ def operacaoDePulo(expressao, posicao):
         else: posicao += 1
         
     return posicao
+
+
+def instrucoesDeMemoria(func, registrador1, registrador2, pulo):
+    endereco = int( registradores[registrador2] ) + (pulo // 4) # cada endereco vai de 4 em quatro bytes (8 * 4 = 32)
+    conteudo = int(registradores[registrador1]) # conteudo que pode ser armazenado em algum endereco de memoria
+    pulo = pulo % 4
+
+    if func == "sw" and pulo == 0: # caso a funcao seja 'sw'(store word)
+        print(func, registrador1, registrador2)
+        memoria[endereco] = bin(conteudo)[2:] # memoria recebe, ou modifica, um endereco de memoria com o valor binario do conteudo
+
+    if func == "lw" and pulo == 0: # caso seja a funcao seja 'lw'
+        print(func, registrador1, registrador2)
+        conteudo = memoria[endereco] if (endereco in memoria) else '0' # carrega o registrador1 com o valor contido no endereco
+        armazenaRegistradores(registrador1, conteudo)
+    if func == "sb":
+        print(func, registrador1, registrador2)
+        binarioMemoria = memoria[endereco] # variavel que recebe o conteudo armazenado naquele endereco de memoria
+        binarioMemoria = ( 32 - len(binarioMemoria) ) * '0' + binarioMemoria
+        conteudo = bin( int(registradores[registrador1]) )[2:]
+        conteudo = conteudo[-8:]
+        conteudo = ( (8 - len(conteudo)) * '0') + conteudo
+        binarioFinal = binarioMemoria[:32 - (8 * (pulo + 1))] + conteudo + binarioMemoria[32 - (8 * pulo):]
+        memoria[endereco] = binarioFinal[binarioFinal.find('1'):]
+    if func == "lb":
+        print(func, registrador1, registrador2)
+        binarioMemoria = memoria[endereco] # variavel que recebe o conteudo armazenado naquele endereco de memoria
+        binarioMemoria = ((32 - len(binarioMemoria)) * '0') + binarioMemoria
+        binarioMemoria = binarioMemoria[32 - (8 * (pulo+1)) : 32 - (8 * pulo)]
+        binarioFinal = (24 * '1') + binarioMemoria if binarioMemoria[0] == '1' else binarioMemoria
+        armazenaRegistradores(registrador1, binarioFinal)
+    if func == "lbu":
+        print(func, registrador1, registrador2)
+        binarioMemoria = memoria[endereco] # variavel que recebe o conteudo armazenado naquele endereco de memoria
+        binarioMemoria = ((32 - len(binarioMemoria)) * '0') + binarioMemoria
+        binarioMemoria = binarioMemoria[32 - (8 * (pulo+1)) : 32 - (8 * pulo)]
+        armazenaRegistradores(registrador1, binarioMemoria)
 
 
 def instrucaoSLL(binario, numero):
