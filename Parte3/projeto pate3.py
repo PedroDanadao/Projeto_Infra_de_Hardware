@@ -411,8 +411,8 @@ def devolveRegistradores():
     listaRegistradores = []
 
     for i in range(31):
-        listaRegistradores.append("$" + str(i) + " = " + registradores["$" + str(i)] + '; ')
-    listaRegistradores.append("$31 = " + registradores["$31"] + ";")
+        listaRegistradores.append("$" + str(i) + "=" + registradores["$" + str(i)] + ';')
+    listaRegistradores.append("$31=" + registradores["$31"] + ";")
 
     return ''.join(listaRegistradores)
 
